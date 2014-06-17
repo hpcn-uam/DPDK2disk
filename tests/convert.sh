@@ -1,0 +1,1 @@
+cat $1  | grep rat | grep -v Worker | sed -e 's/avg.*//gi' | sed -e 's/.*.:.//gi' | sed -e 's/.d.*.%//gi' | sed -e 's/.s.*.%//gi' | sed -e 's/(//gi' | sed -e 's/)//gi' | sed -e 's/\// /gi' | sed -e 's/ /\t/gi' | awk '$1 == "NIC" { nicok+=$2; nicerr+=$3 } $1 == "enq" { print nicerr/(nicok+nicerr), ($3-$2)/$3; nicok=0;nicerr=0 }' 

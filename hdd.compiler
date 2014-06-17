@@ -1,0 +1,1 @@
+gcc `pkg-config --cflags --libs glib-2.0` -D_GNU_SOURCE hdd.c -o hdd
