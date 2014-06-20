@@ -39,9 +39,9 @@ if [ $? -eq 0 ] ; then
         #   packet (default value is 29)    
 
 	build/app/hpcn_n2d -c F -n 2 $1 -- --rx "(1,0,1)" --tx "(1,1)" --w "3" \
-                --rsz "1024, 4096, 1024, 1024" \
-                --bsz "(128, 512), (512, 144), (144, 144)" \
-		--folder "/captura/catch" --maxgiga 1 --n2dW "2" --
+                --rsz "1024, 2048, 1024, 1024" \
+                --bsz "(144, 128), (512, 144), (144, 144)" \
+		--folder "/captura/catch" --maxgiga 2 --n2dW "2" --
 
 #                --bsz "(8, 8), (8, 8), (8, 8)"
               #  | grep rat | grep -v Worker | sed -e 's/avg.*//gi' | sed -e 's/.*.:.//gi' | sed -e 's/.d.*.%//gi' | sed -e 's/.s.*.%//gi' | sed -e 's/(//gi' | sed -e 's/)//gi' | sed -e 's/\// /gi' | sed -e 's/ /\t/gi' | awk '$1 == "NIC" { nicok+=$2; nicerr+=$3 } $1 == "enq" { print nicerr/(nicok+nicerr), ($3-$2)/$3; nicok=0;nicerr=0 }' 

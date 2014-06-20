@@ -74,11 +74,11 @@
 #include "main.h"
 
 #ifndef APP_LCORE_IO_FLUSH
-#define APP_LCORE_IO_FLUSH           0//1000000
+#define APP_LCORE_IO_FLUSH           1000000
 #endif
 
 #ifndef APP_LCORE_WORKER_FLUSH
-#define APP_LCORE_WORKER_FLUSH       0//1000000
+#define APP_LCORE_WORKER_FLUSH       1000000
 #endif
 
 #ifndef APP_STATS

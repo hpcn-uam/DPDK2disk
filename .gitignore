@@ -49,3 +49,4 @@
 *.cmd
 *.~
 build
+*pcap
