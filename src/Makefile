@@ -42,7 +42,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = hpcn_n2d
 
 # all source are stored in SRCS-y
-SRCS-y := main.c config.c init.c runtime.c external.c realtime.c
+SRCS-y := main.c config.c init.c runtime.c external.c hptl.c hptl_deprecated.c
 
 CFLAGS += -O3 -march=native -msse4.2 -msse4.1 -mssse3 -msse4 -msse2
 # CFLAGS += -g 

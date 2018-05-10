@@ -1,5 +1,5 @@
-#ifndef __PCAP_JOSE__H__
-#define __PCAP_JOSE__H__
+#ifndef __PCAP_WRAP__H__
+#define __PCAP_WRAP__H__
 
 /*In this file, it is defined the common PCAP structures for fast accesing*/
 
@@ -12,7 +12,7 @@ typedef struct pcap_hdr_s {
         uint32_t sigfigs;        /* accuracy of timestamps */
         uint32_t snaplen;        /* max length of captured packets, in octets */
         uint32_t network;        /* data link type */
-} pcap_hdr_tJZ;
+} pcap_hdr_tWR;
 
 /* Packet header */
 typedef struct pcaprec_hdr_s {
@@ -20,6 +20,6 @@ typedef struct pcaprec_hdr_s {
         uint32_t ts_usec;        /* timestamp microseconds */
         uint32_t incl_len;       /* number of octets of packet saved in file */
         uint32_t orig_len;       /* actual length of packet */
-} pcaprec_hdr_tJZ;
+} pcaprec_hdr_tWR;
 
 #endif

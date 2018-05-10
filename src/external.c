@@ -11,17 +11,23 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include "external.h"
-#include "realtime.h"
-#include "pcap_jose.h"
+#include "hptl.h"
+#include "hptl_deprecated.h"
+#include "pcap_wrap.h"
 #include "main.h"
 
 #ifndef APP_STATS
 #define APP_STATS                    1000000
 #endif
+
+#define CLK_PREC_DEC   (8)  
+#define CLK_PRECISION  (100000000ul)
+#define CLK_PRECISIONu (CLK_PRECISION/100)
 
 #define FILEOPTIONS   (O_CREAT | O_WRONLY /*| O_NONBLOCK | O_NDELAY*/ /*| O_TRUNC*/ | O_DIRECT | O_SYNC)
 
@@ -43,7 +49,7 @@ uint64_t maxbytes     = 1;
 uint64_t fileWrote    = 0; 
 
 /*PCAP*/
-pcap_hdr_tJZ defaultPcapHeader;
+pcap_hdr_tWR defaultPcapHeader;
 
 /*Buffers*/
 #define BUFFERKIND uint8_t
@@ -63,7 +69,7 @@ uint64_t diskBurst=(1024*1024*1024);//(1024*1024*1024); //4K
  * NOTA: ya están usados: rx, tx, w, rsz, bsz, pos-lb
  * RET < 0 significa error
  **/
-inline int external_config(int argc, char **argv)
+int external_config(int argc, char **argv)
 {
 	int opt;
 	char **argvopt;
@@ -136,7 +142,7 @@ inline int external_config(int argc, char **argv)
 /**
  * Realiza las reservas de memoria y demás requerimientos necesarios para el uso de la aplicación externa
  **/
-inline void external_init(void)
+void external_init(void)
 {
 	int i,j;
 	/*Abrimos el primer fichero*/
@@ -203,7 +209,8 @@ inline void external_init(void)
 	
 	puts("OK!");
 	
-	realtime_init();
+	hptl_config cconf = {.precision=CLK_PREC_DEC, .clockspeed=0};
+	hptl_init(&cconf);
 }
 
 //#define _TIMECORE_
@@ -214,13 +221,13 @@ struct timeval start_ewr, end_ewr;
 uint64_t pktsrecv = 0;
 #endif
 #endif
-inline void external_first_exec(struct app_lcore_params *lp, uint32_t bsz_rd, uint32_t bsz_wr)
+void external_first_exec(struct app_lcore_params *lp, uint32_t bsz_rd, uint32_t bsz_wr)
 {
 		tmp_lp 		= lp ;
 		tmp_bsz_wr 	= bsz_wr;
 		tmp_bsz_rd 	= bsz_rd;
 		
-		realtime_sync_real();
+		hptl_sync();
 		
 		#ifdef _TIMECORE_
 		  gettimeofday(&start_ewr, NULL);
@@ -230,50 +237,50 @@ inline void external_first_exec(struct app_lcore_params *lp, uint32_t bsz_rd, ui
 /**
  * recoge un paquete y lo procesa
  **/
-inline void external_work(struct rte_mbuf * pkt)
+void external_work(struct rte_mbuf * pkt)
 {
 			unsigned pktLen,tmp,pcapHeaderLen;
 			uint8_t* pktData;
 			uint64_t timestamp;
-			pcaprec_hdr_tJZ pcapPktHeader;
+			pcaprec_hdr_tWR pcapPktHeader;
 						
-			pktLen = pkt->pkt.pkt_len;
-			pktData= pkt->pkt.data;
+			pktLen = rte_pktmbuf_pkt_len(pkt);
+			pktData= rte_pktmbuf_mtod(pkt,uint8_t*);
 			
-			//timestamp = realtime_get();
-			timestamp = realtime_getAprox(pktLen); // 0x12345678;//
+			timestamp = hptl_get();
+			//timestamp = hptl_getAprox(pktLen); // 0x12345678;//
 			
-			pcapPktHeader.ts_sec	= timestamp/PRECCISION;
-			pcapPktHeader.ts_usec	= (timestamp/PRECCISIONu)%1000000;
+			pcapPktHeader.ts_sec	= timestamp/CLK_PRECISION;
+			pcapPktHeader.ts_usec	= (timestamp/CLK_PRECISIONu)%1000000;
 			pcapPktHeader.incl_len	= pktLen;
 			pcapPktHeader.orig_len	= pktLen;
-			pcapHeaderLen			= sizeof(pcaprec_hdr_tJZ);
+			pcapHeaderLen			= sizeof(pcaprec_hdr_tWR);
 
 			#ifdef _TIMECORE2_
 			pktsrecv++;
 			#endif
 			
-			if(unlikely(diskBufferWrote+pktLen >= (diskBufferSize-sizeof(pcaprec_hdr_tJZ)))) // comprobamos si el buffer se va a llenar
+			if(unlikely(diskBufferWrote+pktLen >= (diskBufferSize-sizeof(pcaprec_hdr_tWR)))) // comprobamos si el buffer se va a llenar
 			{
-				if(fileWrote+pktLen >= (maxbytes-sizeof(pcaprec_hdr_tJZ))) //Final de fichero alcanzado
+				if(fileWrote+pktLen >= (maxbytes-sizeof(pcaprec_hdr_tWR))) //Final de fichero alcanzado
 				{
 					changeFile[curBuf]	= 1;
 					bytesLeft [curBuf]	= maxbytes-fileWrote;
-					FileStamp [curBuf]	= timestamp/(PRECCISION/10ull);
-					fileWrote=sizeof(pcap_hdr_tJZ);
+					FileStamp [curBuf]	= timestamp/(CLK_PRECISION/10ull);
+					fileWrote=sizeof(pcap_hdr_tWR);
 				}
 				else
 				{	//copiamos hasta llenar
 					tmp=diskBufferSize-diskBufferWrote; // espacio disponible
 						
 					//PCAP PACKET HEADER
-					if(tmp>=sizeof(pcaprec_hdr_tJZ))
+					if(tmp>=sizeof(pcaprec_hdr_tWR))
 					{
 						rte_mov16 (diskBufferPTR, (uint8_t *) (&pcapPktHeader));
-						fileWrote		+= sizeof(pcaprec_hdr_tJZ);
-						diskBufferPTR	+= sizeof(pcaprec_hdr_tJZ);
+						fileWrote		+= sizeof(pcaprec_hdr_tWR);
+						diskBufferPTR	+= sizeof(pcaprec_hdr_tWR);
 						pcapHeaderLen	 = 0;
-						tmp				-= sizeof(pcaprec_hdr_tJZ);
+						tmp				-= sizeof(pcaprec_hdr_tWR);
 					}
 					else
 					{
@@ -305,7 +312,7 @@ inline void external_work(struct rte_mbuf * pkt)
 				#else
 				printf("Buffer Wroted at %lf Gb/s ; %lf Gb/s @ETHER (%.1lf pkt/s)\n", 
 			    ((diskBufferSize)/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec))/1000000.))/(1000*1000*1000./8.),
-				(((diskBufferSize-(pktsrecv*sizeof(pcaprec_hdr_tJZ)+sizeof(pcap_hdr_tJZ)))+pktsrecv*(4/*crc*/+8/*prelud*/+12/*ifg*/))/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec))/1000000.))/(1000*1000*1000./8.),
+				(((diskBufferSize-(pktsrecv*sizeof(pcaprec_hdr_tWR)+sizeof(pcap_hdr_tWR)))+pktsrecv*(4/*crc*/+8/*prelud*/+12/*ifg*/))/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec))/1000000.))/(1000*1000*1000./8.),
 				pktsrecv/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /1000000.));
 				pktsrecv=0;
 				#endif
@@ -321,11 +328,11 @@ inline void external_work(struct rte_mbuf * pkt)
 				
 				diskBufferPTR=diskBuffer[curBuf];
 				
-				if(fileWrote==sizeof(pcap_hdr_tJZ)) //Si el fichero está vacio, escribimos cabecera PCAP
+				if(fileWrote==sizeof(pcap_hdr_tWR)) //Si el fichero está vacio, escribimos cabecera PCAP
 				{
 					rte_memcpy(diskBufferPTR,&defaultPcapHeader,sizeof(defaultPcapHeader));
-					diskBufferPTR	+= sizeof(pcap_hdr_tJZ);
-					diskBufferWrote	 = sizeof(pcap_hdr_tJZ);
+					diskBufferPTR	+= sizeof(pcap_hdr_tWR);
+					diskBufferWrote	 = sizeof(pcap_hdr_tWR);
 				}
 				else
 				{
@@ -333,7 +340,7 @@ inline void external_work(struct rte_mbuf * pkt)
 				}
 			}
 						
-			rte_memcpy(diskBufferPTR, ((uint8_t*)(&pcapPktHeader))+(sizeof(pcaprec_hdr_tJZ)-pcapHeaderLen), pcapHeaderLen);
+			rte_memcpy(diskBufferPTR, ((uint8_t*)(&pcapPktHeader))+(sizeof(pcaprec_hdr_tWR)-pcapHeaderLen), pcapHeaderLen);
 			
 			rte_memcpy(diskBufferPTR+pcapHeaderLen,pktData,pktLen);
 			
@@ -359,7 +366,7 @@ inline void external_work(struct rte_mbuf * pkt)
 /**
  * Encola un paquete y lo envia
  **/
-inline void external_send(struct app_lcore_params_worker *lp, uint32_t bsz_wr, struct rte_mbuf * pkt, uint8_t port)
+void external_send(struct app_lcore_params_worker *lp, uint32_t bsz_wr, struct rte_mbuf * pkt, uint8_t port)
 {
 			uint32_t pos;
 			int ret;
@@ -376,7 +383,7 @@ inline void external_send(struct app_lcore_params_worker *lp, uint32_t bsz_wr, s
 			ret = rte_ring_sp_enqueue_bulk(
 				lp->rings_out[port],
 				(void **) lp->mbuf_out[port].array,
-				bsz_wr);
+				bsz_wr, NULL);
 
 		#if APP_STATS
 			lp->rings_out_iters[port] ++;
@@ -422,7 +429,7 @@ void external_slave(void)
 	struct timeval start, end;
 	#endif
 	
-	sprintf(outputFile,"%s/%llu.pcap",outputFolfer,(realtime_get()/(PRECCISION/10)));
+	sprintf(outputFile,"%s/%lu.pcap",outputFolfer,(hptl_get()/(CLK_PRECISION/10)));
 	output = open( outputFile,  FILEOPTIONS, S_IWUSR );
 	if (output==-1) { perror("open"); exit(-1);	}
 	
@@ -447,7 +454,7 @@ void external_slave(void)
 		}
 		/*if(j < (diskBufferSize-bytesLeft[i])) //NotAllignedWrite:
 		{
-			//printf("Unalligned Write of %llu\n", (diskBufferSize-bytesLeft[i])-j );
+			//printf("Unalligned Write of %lu\n", (diskBufferSize-bytesLeft[i])-j );
 			succes = write( output,  diskBuffer[i]+j,  (diskBufferSize-bytesLeft[i])-j);
 			
 			if(succes==-1)
@@ -455,7 +462,8 @@ void external_slave(void)
 		}*/
 		if(bytesLeft[i])
 		{
-			ftruncate(output, maxbytes-bytesLeft[i]);
+			if(ftruncate(output, maxbytes-bytesLeft[i]))
+				perror("ftruncate failed. File may be corrupted");
 		}
 		
 		if(changeFile[i])
@@ -515,7 +523,7 @@ int main(int argc, char **argv)
 	int ret;
 	struct timeval start, end;
 	
-	test.pkt.pkt_len=SIZEPKTS;
+	rte_pktmbuf_pkt_len(tes)=SIZEPKTS;
 	
 	test.pkt.data=strdup("012345678901234567890123456789012345678901234567890123456789XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 	

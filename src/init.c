@@ -79,40 +79,20 @@ static struct rte_eth_conf port_conf = {
 		.mq_mode	= ETH_MQ_RX_RSS,
 		.split_hdr_size = 0,
 		.header_split   = 0, /**< Header Split disabled */
-		.hw_ip_checksum = 1, /**< IP checksum offload enabled */
+		.hw_ip_checksum = 0, /**< IP checksum offload disabled */
 		.hw_vlan_filter = 0, /**< VLAN filtering disabled */
 		.jumbo_frame    = 0, /**< Jumbo Frame Support disabled */
-		.hw_strip_crc   = 0, /**< CRC stripped by hardware */
+		.hw_strip_crc   = 1, /**< CRC stripped by hardware */
 	},
 	.rx_adv_conf = {
 		.rss_conf = {
 			.rss_key = NULL,
-			.rss_hf = ETH_RSS_IPV4 | ETH_RSS_IPV6,
+			.rss_hf = ETH_RSS_IP,
 		},
 	},
 	.txmode = {
 		.mq_mode = ETH_MQ_TX_NONE,
 	},
-};
-
-static struct rte_eth_rxconf rx_conf = {
-	.rx_thresh = {
-		.pthresh = APP_DEFAULT_NIC_RX_PTHRESH,
-		.hthresh = APP_DEFAULT_NIC_RX_HTHRESH,
-		.wthresh = APP_DEFAULT_NIC_RX_WTHRESH,
-	},
-	.rx_free_thresh = APP_DEFAULT_NIC_RX_FREE_THRESH,
-	.rx_drop_en = APP_DEFAULT_NIC_RX_DROP_EN,
-};
-
-static struct rte_eth_txconf tx_conf = {
-	.tx_thresh = {
-		.pthresh = APP_DEFAULT_NIC_TX_PTHRESH,
-		.hthresh = APP_DEFAULT_NIC_TX_HTHRESH,
-		.wthresh = APP_DEFAULT_NIC_TX_WTHRESH,
-	},
-	.tx_free_thresh = APP_DEFAULT_NIC_TX_FREE_THRESH,
-	.tx_rs_thresh = APP_DEFAULT_NIC_TX_RS_THRESH,
 };
 
 static void
@@ -146,7 +126,7 @@ app_init_mbuf_pools(void)
 			continue;
 		}
 
-		rte_snprintf(name, sizeof(name), "mbuf_pool_%u", socket);
+		snprintf(name, sizeof(name), "mbuf_pool_%u", socket);
 		printf("Creating the mbuf pool for socket %u ...\n", socket);
 		app.pools[socket] = rte_mempool_create(
 			name,
@@ -203,7 +183,7 @@ app_init_rings_rx(void)
 				lcore,
 				socket_io,
 				lcore_worker);
-			rte_snprintf(name, sizeof(name), "app_ring_rx_s%u_io%u_w%u",
+			snprintf(name, sizeof(name), "app_ring_rx_s%u_io%u_w%u",
 				socket_io,
 				lcore,
 				lcore_worker);
@@ -286,7 +266,7 @@ app_init_rings_tx(void)
 
 			printf("Creating ring to connect worker lcore %u with TX port %u (through I/O lcore %u) (socket %u) ...\n",
 				lcore, port, (unsigned)lcore_io, (unsigned)socket_io);
-			rte_snprintf(name, sizeof(name), "app_ring_tx_s%u_w%u_p%u", socket_io, lcore, port);
+			snprintf(name, sizeof(name), "app_ring_tx_s%u_w%u_p%u", socket_io, lcore, port);
 			ring = rte_ring_create(
 				name,
 				app.ring_tx_size,
@@ -362,7 +342,7 @@ check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
 				continue;
 			}
 			/* clear all_ports_up flag if any link down */
-			if (link.link_status == 0) {
+			if (link.link_status == ETH_LINK_DOWN) {
 				all_ports_up = 0;
 				break;
 			}
@@ -393,16 +373,6 @@ app_init_nics(void)
 	uint8_t port, queue;
 	int ret;
 	uint32_t n_rx_queues, n_tx_queues;
-
-	/* Init driver */
-	printf("Initializing the PMD driver ...\n");
-	if (rte_pmd_init_all() < 0) {
-		rte_panic("Cannot init PMD\n");
-	}
-
-	if (rte_eal_pci_probe() < 0) {
-		rte_panic("Cannot probe PCI\n");
-	}
 
 	/* Init NIC ports and queues, then start the ports */
 	for (port = 0; port < APP_MAX_NIC_PORTS; port ++) {
@@ -445,7 +415,7 @@ app_init_nics(void)
 				queue,
 				(uint16_t) app.nic_rx_ring_size,
 				socket,
-				&rx_conf,
+				NULL,
 				pool);
 			if (ret < 0) {
 				rte_panic("Cannot init RX queue %u for port %u (%d)\n",
@@ -466,7 +436,7 @@ app_init_nics(void)
 				0,
 				(uint16_t) app.nic_tx_ring_size,
 				socket,
-				&tx_conf);
+				NULL);
 			if (ret < 0) {
 				rte_panic("Cannot init TX queue 0 for port %d (%d)\n",
 					port,
