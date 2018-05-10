@@ -1,0 +1,6 @@
+[submodule "dpdk-stable"]
+	path = dpdk
+	url = git://dpdk.org/dpdk-stable
+[submodule "src/hptimelib"]
+	path = src/hptimelib
+	url = https://github.com/hpcn-uam/hptimelib.git
