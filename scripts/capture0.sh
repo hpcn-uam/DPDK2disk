@@ -65,9 +65,9 @@ if [ $? -eq 0 ] ; then
         #       is 144)                                                         
         #   F = I/O TX lcore write burst size to NIC TX (default value is 144)  
 
-	sudo build/app/hpcn_n2d -c FFF -n 6 -- --rx "(0,0,1),(0,0,2)" --tx "(0,4)" --w "3" \
-                --rsz "1024, 1024" \
-                --bsz "144, 144" \
+	sudo build/app/hpcn_n2d -c FFF -n 6 -- --rx "(0,0,1)" --tx "(0,2)" --w "3" --n2dW "4" \
+                --rsz "1024, 1024, 1024, 1024" \
+                --bsz "(144, 144), (144, 144), (144, 144)" \
 		--folder $FOLDER --maxgiga $FILELIM --
 
 else

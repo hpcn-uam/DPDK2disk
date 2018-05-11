@@ -387,7 +387,7 @@ void external_send(struct app_lcore_params_worker *lp, uint32_t bsz_wr, struct r
 
 		#if APP_STATS
 			lp->rings_out_iters[port] ++;
-			if (ret == 0) {
+			if (likely(ret)) {
 				lp->rings_out_count[port] += 1;
 			}
 			if (lp->rings_out_iters[port] == APP_STATS){
@@ -402,7 +402,7 @@ void external_send(struct app_lcore_params_worker *lp, uint32_t bsz_wr, struct r
 			}
 		#endif
 
-			if (unlikely(ret == -ENOBUFS)) {
+			if (unlikely(ret == 0)) {
 				uint32_t k;
 				for (k = 0; k < bsz_wr; k ++) {
 					struct rte_mbuf *pkt_to_free = lp->mbuf_out[port].array[k];

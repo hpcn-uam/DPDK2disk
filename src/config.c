@@ -492,31 +492,6 @@ parse_arg_bsz(const char *arg)
 #define APP_ARG_NUMERICAL_SIZE_CHARS 15
 #endif
 
-static int
-parse_arg_pos_lb(const char *arg)
-{
-	uint32_t x;
-	char *endpt;
-
-	if (strnlen(arg, APP_ARG_NUMERICAL_SIZE_CHARS + 1) == APP_ARG_NUMERICAL_SIZE_CHARS + 1) {
-		return -1;
-	}
-
-	errno = 0;
-	x = strtoul(arg, &endpt, 10);
-	if (errno != 0 || endpt == arg || *endpt != '\0'){
-		return -2;
-	}
-
-	if (x >= 64) {
-		return -3;
-	}
-
-	app.pos_lb = (uint8_t) x;
-
-	return 0;
-}
-
 /* Parse the argument given in the command line of the application */
 int
 app_parse_args(int argc, char **argv)
@@ -536,7 +511,6 @@ app_parse_args(int argc, char **argv)
 		{"w", 1, 0, 0},
 		{"rsz", 1, 0, 0},
 		{"bsz", 1, 0, 0},
-		{"pos-lb", 1, 0, 0},
 		{NULL, 0, 0, 0}
 	};
 	uint32_t arg_w = 0;
@@ -591,14 +565,6 @@ app_parse_args(int argc, char **argv)
 				ret = parse_arg_bsz(optarg);
 				if (ret) {
 					printf("Incorrect value for --bsz argument (%d)\n", ret);
-					return -1;
-				}
-			}
-			if (!strcmp(lgopts[option_index].name, "pos-lb")) {
-				arg_pos_lb = 1;
-				ret = parse_arg_pos_lb(optarg);
-				if (ret) {
-					printf("Incorrect value for --pos-lb argument (%d)\n", ret);
 					return -1;
 				}
 			}
